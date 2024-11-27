@@ -11,6 +11,9 @@ from ..models import user_news_association_table
 from sqlalchemy import delete, insert, select
 from sqlalchemy.orm import Session
 from src.news.config import get_NewsSettings
+from  src.crawler.udn_crawler import UDNCrawler
+from src.crawler.crawler_base import NewsWithSummary
+
 NewsSettings=get_NewsSettings()
 article_id_counter = itertools.count(start=1000000)
 openai_client = OpenAI(api_key=NewsSettings.Openai_APIKEY)
@@ -21,16 +24,9 @@ def add_news_article(news_data):
     :return:
     """
     session = Session()
-    session.add(NewsArticle(
-        url=news_data["url"],
-        title=news_data["title"],
-        time=news_data["time"],
-        content=" ".join(news_data["content"]),  # 將內容list轉換為字串
-        summary=news_data["summary"],
-        reason=news_data["reason"],
-    ))
-    session.commit()
+    UDNCrawler.save(news=news_data, db=session)
     session.close()
+
 def fetch_news_articles_by_keyword(search_term, is_initial=False):
     """
     get new by keyword
@@ -42,30 +38,13 @@ def fetch_news_articles_by_keyword(search_term, is_initial=False):
     all_news_data = []
     # iterate pages to get more news data, not actually get all news data
     if is_initial:
-        news = []
-        for page in range(1, 10):
-            pageinfo = {
-                "page": page,
-                "id": f"search:{quote(search_term)}",
-                "channelId": 2,
-                "type": "searchword",
-            }
-            response = requests.get(NEWS_LINK, params=pageinfo)
-            news.append(response.json()["lists"])
-
-        for result in news:
-            all_news_data.append(result)
+        all_news_data = UDNCrawler.startup(search_term=search_term)
+        
     else:
-        pageinfo = {
-            "page": 1,
-            "id": f"search:{quote(search_term)}",
-            "channelId": 2,
-            "type": "searchword",
-        }
-        response = requests.get(NEWS_LINK, params=pageinfo)
+        all_news_data = UDNCrawler.get_headline(search_term=search_term, page=1)
 
-        all_news_data = response.json()["lists"]
     return all_news_data
+
 def get_new_info(is_initial=False):
     """
     get new info
@@ -89,25 +68,7 @@ def get_new_info(is_initial=False):
         )
         relevance = summary_completion.choices[0].message.content
         if relevance == "high":
-            response = requests.get(news["titleLink"])
-            soup = BeautifulSoup(response.text, "html.parser")
-            # 標題
-            title = soup.find("h1", class_="article-content__title").text
-            time = soup.find("time", class_="article-content__time").text
-            # 定位到包含文章內容的 <section>
-            content_section = soup.find("section", class_="article-content__editor")
-
-            paragraphs = [
-                p.text
-                for p in content_section.find_all("p")
-                if p.text.strip() != "" and "?" not in p.text
-            ]
-            detailed_news =  {
-                "url": news["titleLink"],
-                "title": title,
-                "time": time,
-                "content": paragraphs,
-            }
+            detailed_news =  UDNCrawler.parse(news["titleLink"]) #是否改成validate_and_parse
             GPTinfo = [
                 {
                     "role": "system",
@@ -122,9 +83,15 @@ def get_new_info(is_initial=False):
             )
             result = completion.choices[0].message.content
             result = json.loads(result)
-            detailed_news["summary"] = result["影響"]
-            detailed_news["reason"] = result["原因"]
-            add_news_article(detailed_news)
+            detailed_news = NewsWithSummary(
+                url=detailed_news.url,
+                title=detailed_news.title,
+                time=detailed_news.time,
+                content=detailed_news.content,
+                summary=result["影響"],
+                reason=result["原因"],
+            )
+            add_news_article(detailed_news)         
 
 def get_article_upvote_details(article_id, uid, database):
     counter = (
