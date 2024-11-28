@@ -18,9 +18,9 @@ jobs:
     steps:
       - name: Clear and Set Permissions for Temp Folder
         run: |
-          Remove-Item -Recurse -Force "${{ runner.temp }}\*"
-          icacls "${{ runner.temp }}" /grant Everyone:F /T
-        shell: powershell
+          rm -rf "${{ runner.temp }}/*"  # Use `rm` command on macOS to delete files
+          chmod -R 777 "${{ runner.temp }}"  # Set full permissions for everyone
+        shell: bash
 
       - name: Checkout code
         uses: actions/checkout@v3
