@@ -5,7 +5,7 @@ on:
     branches:
       - 'main'
       - 'develop'
-      - 'fix/integration-test' # 新增這一行
+      - 'fix/integration-test' # 新增這一行 
   pull_request:
     branches:
       - 'main'
