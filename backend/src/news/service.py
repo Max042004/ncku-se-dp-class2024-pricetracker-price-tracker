@@ -4,7 +4,6 @@ from urllib.parse import quote
 import requests
 from .constant import NEWS_LINK
 import os
-from openai import OpenAI
 from bs4 import BeautifulSoup
 import itertools
 from ..models import user_news_association_table
