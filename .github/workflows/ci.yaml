@@ -19,9 +19,9 @@ jobs:
     steps:
       - name: Clear and Set Permissions for Temp Folder
         run: |
-          Remove-Item -Recurse -Force "${{ runner.temp }}\*"
-          icacls "${{ runner.temp }}" /grant Everyone:F /T
-        shell: powershell
+          rm -rf "${RUNNER_TEMP}/*"
+          chmod -R 777 "${RUNNER_TEMP}"
+        shell: bash
 
       - name: Checkout code
         uses: actions/checkout@v3
