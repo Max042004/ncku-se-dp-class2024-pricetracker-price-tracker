@@ -106,6 +106,7 @@ def get_article_upvote_details(article_id, uid, database):
                 is not None
         )
     return counter, voted
+    
 def toggle_upvote(article_id, user_id, database):
     existing_upvote = database.execute(
         select(user_news_association_table).where(
