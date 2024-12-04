@@ -5,7 +5,8 @@ on:
     branches:
       - 'main'
       - 'develop'
-      - 'fix/integration-test' # 新增這一行
+      - 'fix/integration-test'
+      - 'refactor/llm_client'
   pull_request:
     branches:
       - 'main'
@@ -13,7 +14,7 @@ on:
 
 jobs:
   test:
-    runs-on: [F74134736]
+    runs-on: [F74136233]
 
     steps:
       - name: Clear and Set Permissions for Temp Folder
