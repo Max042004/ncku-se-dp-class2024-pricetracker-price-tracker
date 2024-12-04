@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from src.news.config import get_NewsSettings
 from  src.crawler.udn_crawler import UDNCrawler
 from src.crawler.crawler_base import NewsWithSummary
+from src.llm_client.openai_client import LLMClient
+from src.llm_client.base import LLMClientMessages, Prompt
 
 NewsSettings=get_NewsSettings()
 article_id_counter = itertools.count(start=1000000)
@@ -55,32 +57,28 @@ def get_new_info(is_initial=False):
     news_data = fetch_news_articles_by_keyword("價格", is_initial=is_initial)
     for news in news_data:
         title = news["title"]
-        summary_prompt = [
-            {
-                "role": "system",
-                "content": "你是一個關聯度評估機器人，請評估新聞標題是否與「民生用品的價格變化」相關，並給予'high'、'medium'、'low'評價。(僅需回答'high'、'medium'、'low'三個詞之一)",
-            },
-            {"role": "user", "content": f"{title}"},
-        ]
-        summary_completion = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=summary_prompt,
-        )
+
+        summary_prompt = LLMClientMessages(
+                model="gpt-3.5-turbo",
+                messages=[
+                    Prompt(role="system", content="你是一個關聯度評估機器人，請評估新聞標題是否與「民生用品的價格變化」相關，並給予'high'、'medium'、'low'評價。(僅需回答'high'、'medium'、'low'三個詞之一)"),
+                    Prompt(role="user", content=f"{title}"),
+                    ])
+
+        summary_completion = LLMClient.get_llm_api(summary_prompt)
+
         relevance = summary_completion.choices[0].message.content
         if relevance == "high":
             detailed_news =  UDNCrawler.parse(news["titleLink"]) #是否改成validate_and_parse
-            GPTinfo = [
-                {
-                    "role": "system",
-                    "content": "你是一個新聞摘要生成機器人，請統整新聞中提及的影響及主要原因 (影響、原因各50個字，請以json格式回答 {'影響': '...', '原因': '...'})",
-                },
-                {"role": "user", "content": " ".join(detailed_news["content"])},
-            ]
-
-            completion = openai_client.chat.completions.create(
+            GPTinfo = LLMClientMessages(
                 model="gpt-3.5-turbo",
-                messages=GPTinfo,
-            )
+                messages=[
+                    Prompt(role="system", content="你是一個新聞摘要生成機器人，請統整新聞中提及的影響及主要原因 (影響、原因各50個字，請以json格式回答 {'影響': '...', '原因': '...'})"),
+                    Prompt(role="user", content=" ".join(detailed_news["content"])),
+                    ])
+
+            completion = LLMClient.get_llm_api(GPTinfo)
+
             result = completion.choices[0].message.content
             result = json.loads(result)
             detailed_news = NewsWithSummary(
