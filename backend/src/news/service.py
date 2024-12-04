@@ -5,7 +5,7 @@ import requests
 from .constant import NEWS_LINK
 import os
 from bs4 import BeautifulSoup
-from OpenAI import openai
+from openai import OpenAI
 import itertools
 from ..models import user_news_association_table
 from sqlalchemy import delete, insert, select
